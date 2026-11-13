@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# test / packaging artifacts
+dev/tmp-*/
+dev/shots/
+dev/.cache/
+dev/*.log
+
+# local data
+*.log
+Thumbs.db
+.DS_Store

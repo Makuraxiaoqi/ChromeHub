@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+  <title>ChromeHub 多开管家</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="../assets/icon.png" alt="" class="brand-icon" />
+        <div class="brand-text">
+          <strong>ChromeHub</strong>
+          <span>多开管家</span>
+        </div>
+      </div>
+
+      <nav class="nav" id="nav">
+        <button class="nav-item active" data-view="profiles">
+          <span class="nav-icon" data-icon="browser"></span>
+          <span>浏览器</span>
+          <em class="nav-badge" id="navRunningBadge" hidden>0</em>
+        </button>
+        <button class="nav-item" data-view="presets">
+          <span class="nav-icon" data-icon="preset"></span>
+          <span>预设</span>
+        </button>
+        <button class="nav-item" data-view="extensions">
+          <span class="nav-icon" data-icon="puzzle"></span>
+          <span>扩展库</span>
+        </button>
+        <button class="nav-item" data-view="scripts">
+          <span class="nav-icon" data-icon="code"></span>
+          <span>脚本库</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <span class="nav-icon" data-icon="settings"></span>
+          <span>设置</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="memory-panel">
+          <div class="memory-row">
+            <span class="memory-icon" data-icon="memory"></span>
+            <div>
+              <div class="memory-title">常驻页面</div>
+              <div class="memory-sub" id="memorySummary">0 个浏览器 · 0 个页面</div>
+            </div>
+          </div>
+          <div class="memory-bar"><span id="memoryBarFill"></span></div>
+          <div class="memory-row memory-row-small">
+            <span>页面 JS 堆</span>
+            <strong id="memoryHeap">0 MB</strong>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-block" id="stopAllBtn">
+          <span data-icon="stop"></span>
+          停止全部浏览器
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1 id="viewTitle">浏览器</h1>
+          <p id="viewSubtitle">每个浏览器都有独立的 Cookie、缓存与登录状态</p>
+        </div>
+        <div class="topbar-actions" id="viewActions"></div>
+      </header>
+      <section class="view-root" id="viewRoot"></section>
+    </main>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="dialogRoot"></div>
+  <div id="toastRoot" class="toast-root"></div>
+
+  <script src="icons.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

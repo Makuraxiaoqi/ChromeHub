@@ -1,0 +1,28 @@
+{
+  "name": "chrome-hub",
+  "productName": "ChromeHub 多开管家",
+  "version": "1.0.0",
+  "description": "管理多个独立 Chromium 浏览器：预设扩展、脚本与启动配置，Cookie 持久保存",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "install-browser": "playwright install chromium",
+    "test": "node dev/test-core.mjs",
+    "test:ui": "node dev/test-ui.mjs",
+    "test:e2e": "node dev/test-e2e.mjs",
+    "pack": "node dev/pack.mjs"
+  },
+  "author": "Makura",
+  "license": "MIT",
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "extract-zip": "^2.0.1",
+    "playwright": "^1.65.0",
+    "playwright-core": "^1.65.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^45.3.0"
+  }
+}
