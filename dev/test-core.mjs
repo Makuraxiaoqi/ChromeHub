@@ -8,6 +8,7 @@ const AdmZip = require('adm-zip');
 const { BrowserRuntime } = require('../lib/runtime');
 const { importExtensionFromPath } = require('../lib/extensions');
 const { parseUserScript } = require('../lib/scripts');
+const { chromiumDownloadTarget } = require('../lib/chromium');
 
 const root = path.resolve(import.meta.dirname, '..');
 const tmp = path.join(root, 'dev', 'tmp-core');
@@ -19,6 +20,14 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
   if (!ok) fail.push(name);
 };
+
+const winTarget = chromiumDownloadTarget('win32', 'x64');
+const linuxTarget = chromiumDownloadTarget('linux', 'x64');
+check('Windows 内核下载布局', winTarget.zipName === 'chrome-win64.zip' && winTarget.executable === 'chrome.exe');
+check(
+  'Linux 内核下载布局',
+  linuxTarget.ctfPlatform === 'linux64' && linuxTarget.zipName === 'chrome-linux64.zip' && linuxTarget.executable === 'chrome'
+);
 
 // ---------- local site ----------
 const server = http.createServer((req, res) => {

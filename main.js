@@ -19,8 +19,10 @@ const { parseUserScript } = require('./lib/scripts');
 const { chromiumStatus, installChromium } = require('./lib/chromium');
 const { ensureDir } = require('./lib/util');
 
-app.setAppUserModelId('com.makura.chromehub');
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.makura.chromehub');
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+}
 
 let mainWindow = null;
 let tray = null;
@@ -35,9 +37,14 @@ const extensionsRoot = path.join(userDataDir, 'extensions');
 const profilesRoot = path.join(userDataDir, 'profiles');
 
 function iconPath() {
-  const ico = path.join(__dirname, 'assets', 'icon.ico');
-  if (fs.existsSync(ico)) return ico;
   const png = path.join(__dirname, 'assets', 'icon.png');
+  const ico = path.join(__dirname, 'assets', 'icon.ico');
+  if (process.platform === 'linux') {
+    if (fs.existsSync(png)) return png;
+    if (fs.existsSync(ico)) return ico;
+    return '';
+  }
+  if (fs.existsSync(ico)) return ico;
   if (fs.existsSync(png)) return png;
   return '';
 }
@@ -71,31 +78,36 @@ function showMainWindow() {
 
 function createTray() {
   if (tray) return;
-  const iconFile = iconPath();
-  const image = iconFile ? nativeImage.createFromPath(iconFile) : nativeImage.createEmpty();
-  tray = new Tray(image);
-  tray.setToolTip('ChromeHub 多开管家');
-  const menu = Menu.buildFromTemplate([
-    { label: '显示主界面', click: showMainWindow },
-    {
-      label: '停止全部浏览器',
-      click: async () => {
-        await runtime.stopAll();
+  try {
+    const iconFile = iconPath();
+    const image = iconFile ? nativeImage.createFromPath(iconFile) : nativeImage.createEmpty();
+    tray = new Tray(image);
+    tray.setToolTip('ChromeHub 多开管家');
+    const menu = Menu.buildFromTemplate([
+      { label: '显示主界面', click: showMainWindow },
+      {
+        label: '停止全部浏览器',
+        click: async () => {
+          await runtime.stopAll();
+        }
+      },
+      { type: 'separator' },
+      {
+        label: '退出 ChromeHub',
+        click: async () => {
+          isQuitting = true;
+          await runtime.stopAll();
+          app.quit();
+        }
       }
-    },
-    { type: 'separator' },
-    {
-      label: '退出 ChromeHub',
-      click: async () => {
-        isQuitting = true;
-        await runtime.stopAll();
-        app.quit();
-      }
-    }
-  ]);
-  tray.setContextMenu(menu);
-  tray.on('click', showMainWindow);
-  tray.on('double-click', showMainWindow);
+    ]);
+    tray.setContextMenu(menu);
+    tray.on('click', showMainWindow);
+    tray.on('double-click', showMainWindow);
+  } catch (error) {
+    tray = null;
+    console.warn(`托盘不可用：${error.message}`);
+  }
 }
 
 function createWindow() {
@@ -149,13 +161,15 @@ function createWindow() {
       mainWindow.hide();
       if (!balloonShown) {
         balloonShown = true;
-        try {
-          tray.displayBalloon({
-            title: 'ChromeHub 仍在运行',
-            content: '窗口已收进托盘，浏览器页面和脚本会继续常驻运行。'
-          });
-        } catch {
-          /* ignore */
+        if (process.platform === 'win32') {
+          try {
+            tray.displayBalloon({
+              title: 'ChromeHub 仍在运行',
+              content: '窗口已收进托盘，浏览器页面和脚本会继续常驻运行。'
+            });
+          } catch {
+            /* ignore */
+          }
         }
       }
     }

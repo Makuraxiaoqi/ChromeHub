@@ -11,7 +11,9 @@
     "test": "node dev/test-core.mjs",
     "test:ui": "node dev/test-ui.mjs",
     "test:e2e": "node dev/test-e2e.mjs",
-    "pack": "node dev/pack.mjs"
+    "pack": "node dev/pack.mjs",
+    "pack:win": "node dev/pack.mjs --platform=win32",
+    "pack:linux": "node dev/pack.mjs --platform=linux"
   },
   "author": "Makura",
   "license": "MIT",

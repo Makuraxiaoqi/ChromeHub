@@ -1,6 +1,6 @@
 # ChromeHub 多开管家
 
-一个 Windows 桌面工具，用来批量管理互相隔离的 Chromium 浏览器实例。
+一个跨平台桌面工具（Windows x64 / Linux x64），用来批量管理互相隔离的 Chromium 浏览器实例。
 
 每个浏览器都有独立的用户数据目录，Cookie、登录状态和本地存储互不干扰；新建时可以套用「预设」，一次性装好指定的扩展和用户脚本；页面支持后台常驻，让依赖页面的采集脚本持续运行，同时提供多档内存优化模式。
 
@@ -19,33 +19,59 @@
 
 ## 环境要求
 
-- Windows 10 / 11（x64）
+- Windows 10 / 11（x64）或主流 Linux 发行版（x64，需 glibc）
 - [Node.js](https://nodejs.org/) 20 或更高版本（开发时使用 24.x）
 - Git（仅源码方式需要）
-- 首次运行需联网下载 Chromium，约 215 MB
+- 首次运行需联网下载 Chromium，约 200–215 MB
+
+Linux 运行 Chromium 还需要常见的图形与多媒体库，缺少时启动浏览器会报缺库错误。Debian / Ubuntu 可先安装：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
+  libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 \
+  libasound2 libpango-1.0-0 libcairo2 libx11-xcb1 libxss1
+```
+
+其他发行版可参考 Playwright 的依赖列表，或在源码目录执行 `npx playwright install-deps chromium`。
 
 ## 快速开始
 
 ### 方式一：打包版
 
-在仓库的 **Releases** 页面下载 `ChromeHub-win32-x64.zip`（若暂未提供，请使用下面的源码方式），解压后运行文件夹内的 `ChromeHub.exe`。
+在仓库的 **Releases** 页面下载对应平台的压缩包（若暂未提供，请使用下面的源码方式）。
+
+**Windows**：下载 `ChromeHub-win32-x64.zip`，解压后运行文件夹内的 `ChromeHub.exe`。
+
+**Linux**：下载 `ChromeHub-linux-x64.tar.gz`：
+
+```bash
+tar -xzf ChromeHub-linux-x64.tar.gz
+cd ChromeHub-linux-x64
+./ChromeHub
+```
 
 注意：
 
-- 必须解压**整个文件夹**再运行，不能只把 exe 拖出来。
-- 程序未做代码签名，Windows SmartScreen 可能提示「已保护你的电脑」，选择「更多信息 → 仍要运行」即可。
+- 必须保留**整个文件夹**再运行，不能只把可执行文件单独拖出来。
+- Windows 版未做代码签名，SmartScreen 可能提示「已保护你的电脑」，选择「更多信息 → 仍要运行」即可。
+- Linux 包已保留可执行权限；若使用 zip 解压导致权限丢失，执行 `chmod +x ChromeHub chrome-sandbox chrome_crashpad_handler`。
 - 首次启动请到「设置 → 浏览器内核」下载 Chromium。
 
 ### 方式二：源码运行
 
-```powershell
+Windows PowerShell / Linux Bash 通用：
+
+```bash
 git clone https://github.com/Makuraxiaoqi/ChromeHub.git
 cd ChromeHub
 npm install
 npm start
 ```
 
-国内网络安装慢时可以先切换镜像：
+国内网络安装慢时可以先切换镜像。
+
+Windows PowerShell：
 
 ```powershell
 npm config set registry https://registry.npmmirror.com
@@ -53,15 +79,23 @@ $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
 npm install
 ```
 
+Linux：
+
+```bash
+npm config set registry https://registry.npmmirror.com
+export ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
+npm install
+```
+
 `npm install` 只安装 Electron 等依赖，Chromium 内核在应用内「设置」页下载，也可以手动执行：
 
-```powershell
+```bash
 npm run install-browser
 ```
 
 调试模式（打开开发者工具）：
 
-```powershell
+```bash
 npm run dev
 ```
 
@@ -92,13 +126,33 @@ npm run dev
 
 ## 打包
 
-```powershell
-npm run pack
+```bash
+npm run pack:win     # Windows x64 → dist/ChromeHub-win32-x64/ChromeHub.exe
+npm run pack:linux   # Linux x64   → dist/ChromeHub-linux-x64/ChromeHub
 ```
 
-输出目录：`dist\ChromeHub-win32-x64\`，可执行文件为 `ChromeHub.exe`。
+`npm run pack` 等同于 `pack:win`。打包脚本会优先复用本机 Electron 缓存，缓存缺失时从 npmmirror 下载，避免直连 GitHub。`dist/` 与 `node_modules/` 不会提交到仓库。
 
-打包脚本会优先复用本机 Electron 缓存，缓存缺失时从 npmmirror 下载，避免直连 GitHub。`dist/` 与 `node_modules/` 不会提交到仓库。
+在 Windows 上也可以交叉打出 Linux 包，但 Linux 包建议在 Linux 或 CI 中构建并做一次启动验证。制作 Linux 分发压缩包时需保留可执行权限：
+
+```bash
+tar -czf ChromeHub-linux-x64.tar.gz -C dist ChromeHub-linux-x64
+```
+
+## Linux 说明
+
+- Chromium 内核会自动下载 Chrome for Testing 的 `chrome-linux64` 版本，安装到 `~/.cache/ms-playwright/`，与 Windows 逻辑一致。
+- 若提示 `The SUID sandbox helper binary was found, but is not configured correctly`，说明系统未启用非特权用户命名空间。推荐修复沙箱：
+
+  ```bash
+  sudo chown root:root chrome-sandbox
+  sudo chmod 4755 chrome-sandbox
+  ```
+
+  容器或无法使用 root 的环境可临时用 `./ChromeHub --no-sandbox` 启动（会降低安全性）。
+- 以 root 身份运行时，程序会给内部 Chromium 自动追加 `--no-sandbox`，否则 Chromium 无法启动。
+- 托盘依赖桌面环境的 StatusNotifier / AppIndicator 支持。GNOME 默认不显示托盘图标，需要安装 AppIndicator 扩展；没有托盘时，关闭主窗口会退出程序并停止所有浏览器。
+- 隐藏模式使用 Chromium 的新版 headless，扩展和用户脚本仍会加载；若某个扩展依赖完整图形栈，请改用「显示」窗口模式。
 
 ## 测试
 
@@ -108,24 +162,25 @@ npm run test:ui   # Electron 界面冒烟测试
 npm run test:e2e  # 端到端：新建浏览器、扩展 / 脚本选择、预设套用、重启恢复
 ```
 
-测试会使用临时目录和独立配置，不会影响日常正在使用的实例数据。
+测试会使用临时目录和独立配置，不会影响日常正在使用的实例数据。Linux 无桌面环境时，UI / E2E 测试请用 `xvfb-run -a npm run test:ui` 运行。
 
 ## 数据目录
 
-| 内容 | 位置 |
-| --- | --- |
-| 配置、实例数据、导入的扩展 | `%APPDATA%\ChromeHub 多开管家\` |
-| Chromium 内核 | `%LOCALAPPDATA%\ms-playwright\chromium-<revision>\` |
-| 打包产物 | `dist\ChromeHub-win32-x64\` |
+| 内容 | Windows | Linux |
+| --- | --- | --- |
+| 配置、实例数据、导入的扩展 | `%APPDATA%\ChromeHub 多开管家\` | `~/.config/ChromeHub 多开管家/` |
+| Chromium 内核 | `%LOCALAPPDATA%\ms-playwright\chromium-<revision>\` | `~/.cache/ms-playwright/chromium-<revision>/` |
+| 打包产物 | `dist\ChromeHub-win32-x64\` | `dist/ChromeHub-linux-x64/` |
 
-卸载或迁移时，备份 `%APPDATA%\ChromeHub 多开管家\` 即可保留全部实例的登录状态。
+卸载或迁移时，备份对应的配置目录即可保留全部实例的登录状态。
 
 ## 已知限制
 
-- 仅支持 Windows x64。
+- 仅提供 Windows x64 与 Linux x64 构建，不支持 Windows 7/8 和 32 位系统。
+- Linux 版依赖目标发行版的 Chromium 系统库，库版本差异可能需要额外安装依赖。
 - Chromium 158 已不再支持 Manifest V2，MV2 扩展可能无法加载，建议使用 MV3 版本。
 - 首版不包含代理配置。
-- 程序未签名，分发时可能触发 SmartScreen 提示。
+- Windows 程序未签名，分发时可能触发 SmartScreen 提示。
 - 用户脚本引擎只实现常用 GM API，并非完整兼容 Tampermonkey。
 
 ## 项目结构
