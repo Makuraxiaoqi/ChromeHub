@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld('api', {
   showItem: (target) => ipcRenderer.invoke('shell:show-item', target),
   openUserData: () => ipcRenderer.invoke('app:open-user-data'),
   copyText: (text) => ipcRenderer.invoke('app:copy-text', text),
+  chooseDownloadDir: () => ipcRenderer.invoke('download:choose-dir'),
+  openDownloadRoot: () => ipcRenderer.invoke('download:open-root'),
 
   onRuntimeStatus: (callback) => {
     const listener = (_event, status) => callback(status);
@@ -47,6 +49,11 @@ contextBridge.exposeInMainWorld('api', {
     const listener = (_event, progress) => callback(progress);
     ipcRenderer.on('browser:install-progress', listener);
     return () => ipcRenderer.removeListener('browser:install-progress', listener);
+  },
+  onDownloadDone: (callback) => {
+    const listener = (_event, info) => callback(info);
+    ipcRenderer.on('download:done', listener);
+    return () => ipcRenderer.removeListener('download:done', listener);
   },
   onOpenProfile: (callback) => {
     const listener = (_event, id) => callback(id);

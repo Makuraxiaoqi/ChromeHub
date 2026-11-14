@@ -31,6 +31,14 @@ check(
 
 // ---------- local site ----------
 const server = http.createServer((req, res) => {
+  if (req.url.startsWith('/download')) {
+    res.writeHead(200, {
+      'content-type': 'text/plain; charset=utf-8',
+      'content-disposition': 'attachment; filename="chromehub-test.txt"'
+    });
+    res.end('chromehub download body');
+    return;
+  }
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
   res.end(`<!doctype html><html><head><title>fixture</title></head><body><h1>fixture</h1>
   <script>document.documentElement.dataset.pageScript = 'page';</script></body></html>`);
@@ -92,17 +100,31 @@ const state = {
   }]
 };
 
+const downloadEvents = [];
 const runtime = new BrowserRuntime({
   getState: () => state,
   userDataDir: path.join(tmp, 'userdata'),
+  systemDownloadsDir: path.join(tmp, 'system-downloads'),
   onEvent: (event) => {
     if (event.type === 'status') {
       for (const st of event.status) {
         // console.log('status', st.profileId, st.state, st.pages, st.error || '');
       }
+    } else if (event.type === 'download') {
+      downloadEvents.push(event);
     }
   }
 });
+
+async function waitForDownload(count) {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const done = downloadEvents.filter((event) => !event.error);
+    if (done.length >= count) return done[count - 1];
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  throw new Error(`等待下载超时（已完成 ${downloadEvents.length} 个）`);
+}
 
 try {
   const st = await runtime.launch('p_test');
@@ -152,6 +174,31 @@ try {
     gm: document.documentElement.dataset.gmValue
   }));
   check('重启后脚本继续注入', info2.script === 'ok' && info2.gm === 'hello-from-gm');
+
+  // downloads: original file name, duplicate suffix, clean temp dir
+  const dlPage = await context2.newPage();
+  await dlPage.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
+  const triggerDownload = () => dlPage.evaluate(() => { location.href = '/download'; }).catch(() => {});
+  await triggerDownload();
+  const firstDownload = await waitForDownload(1);
+  check(
+    '下载保存原始文件名',
+    firstDownload.fileName === 'chromehub-test.txt'
+      && fs.existsSync(firstDownload.path)
+      && fs.readFileSync(firstDownload.path, 'utf8') === 'chromehub download body',
+    firstDownload.fileName
+  );
+  await triggerDownload();
+  const secondDownload = await waitForDownload(2);
+  check(
+    '重复下载自动编号',
+    secondDownload.fileName === 'chromehub-test (1).txt' && fs.existsSync(secondDownload.path),
+    secondDownload.fileName
+  );
+  check('下载目录为系统下载目录', path.dirname(firstDownload.path) === path.join(tmp, 'system-downloads'), path.dirname(firstDownload.path));
+  const leftoverDownloads = fs.readdirSync(runtime.tempDownloadsDir('p_test'));
+  check('下载后清理临时文件', leftoverDownloads.length === 0, leftoverDownloads.join(', '));
+  await dlPage.close().catch(() => {});
 
   // keepalive: close last page, expect recreation
   await page2.close();

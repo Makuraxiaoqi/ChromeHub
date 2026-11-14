@@ -35,6 +35,7 @@ let balloonShown = false;
 const userDataDir = app.getPath('userData');
 const extensionsRoot = path.join(userDataDir, 'extensions');
 const profilesRoot = path.join(userDataDir, 'profiles');
+const systemDownloadsDir = app.getPath('downloads');
 
 function iconPath() {
   const png = path.join(__dirname, 'assets', 'icon.png');
@@ -54,6 +55,21 @@ function sendRuntimeStatus(status) {
     mainWindow.webContents.send('runtime:status', status);
   }
   updateTray(status);
+}
+
+function sendDownload(info) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('download:done', info);
+  }
+}
+
+async function askDownloadPath({ profileName, suggestedName, directory }) {
+  const result = await dialog.showSaveDialog({
+    title: profileName ? `保存下载文件 · ${profileName}` : '保存下载文件',
+    defaultPath: path.join(directory, suggestedName),
+    buttonLabel: '保存'
+  });
+  return result.canceled ? '' : result.filePath;
 }
 
 function runningCount(status = runtime?.status() || []) {
@@ -193,6 +209,7 @@ function registerIpc() {
       userData: userDataDir,
       extensions: extensionsRoot,
       profiles: profilesRoot,
+      downloads: systemDownloadsDir,
       state: path.join(userDataDir, 'state.json')
     },
     browser: chromiumStatus(),
@@ -288,7 +305,7 @@ function registerIpc() {
     return true;
   });
   ipcMain.handle('profile:open-downloads', async (_event, id) => {
-    const dir = ensureDir(runtime.downloadsDir(id));
+    const dir = ensureDir(runtime.downloadDir(id));
     await shell.openPath(dir);
     return true;
   });
@@ -329,6 +346,18 @@ function registerIpc() {
   });
   ipcMain.handle('app:open-user-data', async () => {
     await shell.openPath(userDataDir);
+    return true;
+  });
+  ipcMain.handle('download:choose-dir', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择下载目录',
+      properties: ['openDirectory', 'createDirectory']
+    });
+    return result.canceled ? '' : result.filePaths[0] || '';
+  });
+  ipcMain.handle('download:open-root', async () => {
+    const dir = ensureDir(runtime.downloadsRoot());
+    await shell.openPath(dir);
     return true;
   });
   ipcMain.handle('app:copy-text', (_event, text) => {
@@ -377,8 +406,11 @@ if (!gotLock) {
     runtime = new BrowserRuntime({
       getState: () => store.get(),
       userDataDir,
+      systemDownloadsDir,
+      onDownloadPath: askDownloadPath,
       onEvent: (event) => {
         if (event.type === 'status') sendRuntimeStatus(event.status);
+        else if (event.type === 'download') sendDownload(event);
       }
     });
     registerIpc();

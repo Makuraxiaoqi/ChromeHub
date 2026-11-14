@@ -71,6 +71,13 @@
     }
   }
 
+  function downloadLocationLabel(settings = state.settings) {
+    const mode = settings.downloadDirMode || 'system';
+    if (mode === 'profile') return '每个浏览器独立目录（profiles/<实例ID>/Downloads）';
+    if (mode === 'custom') return settings.downloadCustomDir || '未选择，回退到系统下载目录';
+    return info?.paths?.downloads || '系统下载目录';
+  }
+
   function firstChar(name) {
     const chars = [...String(name || 'B').trim()];
     return chars[0] || 'B';
@@ -1153,7 +1160,7 @@
   /* ------------------------------ settings ------------------------------ */
 
   function renderSettings() {
-    setHeader('设置', '内存策略、浏览器内核与数据目录', '');
+    setHeader('设置', '内存策略、下载、浏览器内核与数据目录', '');
     const browser = info.browser || {};
     const settings = state.settings;
     $('#viewRoot').innerHTML = `<div class="settings-stack">
@@ -1186,6 +1193,31 @@
         <div class="settings-line" style="margin-top:6px"><span>后台定时器节流</span><strong>已关闭（脚本常驻）</strong></div>
         <div class="settings-line"><span>Memory Saver / 标签页丢弃</span><strong>已关闭</strong></div>
         <div class="settings-line"><span>页面被遮挡时降频</span><strong>已禁用（脚本持续运行）</strong></div>
+      </section>
+
+      <section class="settings-card">
+        <h2>${icon('download')}下载</h2>
+        <p>默认与普通浏览器一致：文件直接存到系统下载目录，保留原始文件名，重名时自动加「(1)」，下载完成会提示。设置只影响之后的下载，无需重启浏览器。</p>
+        <div class="settings-grid">
+          <div class="field"><label>保存位置</label>
+            <select class="select" data-setting="downloadDirMode">
+              <option value="system" ${(settings.downloadDirMode || 'system') === 'system' ? 'selected' : ''}>系统下载目录</option>
+              <option value="profile" ${settings.downloadDirMode === 'profile' ? 'selected' : ''}>每个浏览器独立目录</option>
+              <option value="custom" ${settings.downloadDirMode === 'custom' ? 'selected' : ''}>自定义目录</option>
+            </select>
+            <span class="field-hint">当前：${esc(downloadLocationLabel(settings))}</span>
+          </div>
+          <div class="field"><label>自定义目录</label>
+            <div class="path-box"><span>${esc(settings.downloadCustomDir || '未设置')}</span><span class="spacer"></span><button class="icon-btn" data-act="choose-download-dir" title="选择目录">${icon('folder')}</button></div>
+            <span class="field-hint">仅在选择「自定义目录」时生效，留空则回退到系统下载目录。</span>
+          </div>
+        </div>
+        <label class="check" style="margin-top:12px"><input type="checkbox" data-setting="downloadAsk" ${settings.downloadAsk === true ? 'checked' : ''} /><span><strong>每次下载询问保存位置</strong><span>像普通浏览器勾选「下载前询问每个文件的保存位置」；关闭则按上面的位置自动保存。</span></span></label>
+        <div class="card-actions" style="margin-top:14px">
+          <button class="btn btn-ghost" data-act="open-downloads-root">${icon('external')}打开下载目录</button>
+          <div class="spacer"></div>
+          <span class="field-hint">下载时使用临时文件，完成后转存并清理，不会留下无扩展名的乱码文件</span>
+        </div>
       </section>
 
       <section class="settings-card">
@@ -1229,11 +1261,28 @@
       toast('内存策略已更新，下次启动浏览器生效');
     }));
     $$('[data-setting]', $('#viewRoot')).forEach((input) => input.addEventListener('change', async () => {
-      state.settings[input.dataset.setting] = input.dataset.setting === 'jsHeapMb' ? Number(input.value) : input.value;
+      const key = input.dataset.setting;
+      state.settings[key] = input.type === 'checkbox'
+        ? input.checked
+        : key === 'jsHeapMb' ? Number(input.value) : input.value;
       await persist();
       renderSettings();
       toast('设置已保存');
     }));
+  }
+
+  async function chooseDownloadDir() {
+    try {
+      const dir = await api.chooseDownloadDir();
+      if (!dir) return;
+      state.settings.downloadDirMode = 'custom';
+      state.settings.downloadCustomDir = dir;
+      await persist();
+      renderSettings();
+      toast('下载目录已更新');
+    } catch (error) {
+      toast(`选择失败：${error.message}`, 'error');
+    }
   }
 
   async function installBrowser() {
@@ -1353,6 +1402,12 @@
       case 'open-browser-cache':
         api.openBrowserCache().catch((error) => toast(error.message, 'error'));
         break;
+      case 'choose-download-dir':
+        chooseDownloadDir();
+        break;
+      case 'open-downloads-root':
+        api.openDownloadRoot().catch((error) => toast(error.message, 'error'));
+        break;
       case 'open-user-data':
         api.openUserData().catch((error) => toast(error.message, 'error'));
         break;
@@ -1432,6 +1487,12 @@
     api.onOpenProfile(() => {
       switchView('profiles');
       showMain();
+    });
+
+    api.onDownloadDone((item) => {
+      if (!item) return;
+      if (item.error) toast(`下载失败：${item.error}`, 'error');
+      else if (item.fileName) toast(`已下载：${item.fileName}`);
     });
   }
 
